@@ -1,5 +1,11 @@
 export const LEVEL_COUNT = 5;
 export const ROUND_SIZE = 50;
+/**
+ * Answers kept for the progress page. 90-day accuracy trends and the activity
+ * heatmap read from this list, so it needs to outlast a few heavy study weeks.
+ * (Roughly 165 KB of local storage at capacity.)
+ */
+export const HISTORY_LIMIT = 1500;
 
 const DATE_NOW = () => new Date().toISOString();
 
@@ -239,7 +245,7 @@ export function recordAnswer(state, wordId, correct, answeredAt = DATE_NOW()) {
     history: [
       { wordId, correct: Boolean(correct), fromLevel: target.level, toLevel: nextLevel, answeredAt },
       ...state.history,
-    ].slice(0, 200),
+    ].slice(0, HISTORY_LIMIT),
     updatedAt: answeredAt,
   };
 }

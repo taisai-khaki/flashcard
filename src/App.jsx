@@ -4,6 +4,7 @@ import { Sidebar } from './components/Sidebar.jsx';
 import { Overview } from './components/Overview.jsx';
 import { StudyPage } from './components/StudyPage.jsx';
 import { StudySession } from './components/StudySession.jsx';
+import { AnalyticsPage } from './components/AnalyticsPage.jsx';
 import { BankPage } from './components/BankPage.jsx';
 import {
   addWords,
@@ -19,6 +20,7 @@ const STORAGE_KEY = 'palabra.flashcards.v1';
 const VIEW_LABELS = {
   overview: 'Overview',
   study: 'Study room',
+  progress: 'Progress',
   bank: 'Word bank',
 };
 
@@ -49,6 +51,8 @@ export default function App() {
   const [direction, setDirection] = useState('mixed');
   const [session, setSession] = useState(null);
   const [summary, setSummary] = useState(null);
+  // Where "back to study room" should actually lead, once a round is over.
+  const [sessionReturn, setSessionReturn] = useState('study');
 
   useEffect(() => {
     setAppState((current) => {
@@ -65,7 +69,7 @@ export default function App() {
     }
   }, [appState]);
 
-  function startSession(level) {
+  function startSession(level, returnView = 'study') {
     const next = createSession(appState, level, direction);
     if (!next) return;
     setSession({
@@ -76,6 +80,7 @@ export default function App() {
       incorrect: 0,
     });
     setSummary(null);
+    setSessionReturn(returnView);
     setActiveView('study');
   }
 
@@ -114,7 +119,7 @@ export default function App() {
 
   function exitSession() {
     setSession(null);
-    setActiveView('study');
+    setActiveView(sessionReturn);
   }
 
   function importWords(entries) {
@@ -177,6 +182,13 @@ export default function App() {
               onDirectionChange={setDirection}
               onStartSession={startSession}
               summary={summary}
+            />
+          )}
+          {activeView === 'progress' && (
+            <AnalyticsPage
+              state={appState}
+              onNavigate={navigateTo}
+              onStartSession={startSession}
             />
           )}
           {activeView === 'bank' && <BankPage state={appState} onImport={importWords} />}

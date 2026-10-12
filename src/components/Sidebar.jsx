@@ -6,11 +6,13 @@ import {
   LibraryBig,
   Plus,
   Sparkles,
+  TrendingUp,
 } from 'lucide-react';
 
 const NAV_ITEMS = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
   { id: 'study', label: 'Study room', icon: BookOpenText },
+  { id: 'progress', label: 'Progress', icon: TrendingUp },
   { id: 'bank', label: 'Word bank', icon: LibraryBig },
 ];
 
@@ -38,10 +40,11 @@ export function Sidebar({ activeView, onNavigate, totalWords, learnedWords, onAd
         ))}
       </nav>
 
-      <div className="sidebar-card">
+      <button className="sidebar-card" onClick={() => onNavigate('progress')} aria-label="Open your progress">
         <div className="sidebar-card-top">
           <span className="sidebar-card-icon"><ChartNoAxesColumnIncreasing size={16} /></span>
           <span className="sidebar-card-kicker">YOUR JOURNEY</span>
+          <TrendingUp size={13} className="sidebar-card-arrow" />
         </div>
         <div className="sidebar-progress-copy">
           <span>{learnedWords} learned</span>
@@ -51,7 +54,7 @@ export function Sidebar({ activeView, onNavigate, totalWords, learnedWords, onAd
           <span style={{ width: `${totalWords ? (learnedWords / totalWords) * 100 : 0}%` }} />
         </div>
         <p>Small steps add up to fluency.</p>
-      </div>
+      </button>
 
       <div className="sidebar-bottom">
         <button className="quick-add-link" onClick={onAddWords}>
