@@ -9,7 +9,13 @@ import {
   Sparkles,
   Target,
 } from 'lucide-react';
-import { getLevelCounts, getReadyCount, getStats, isLevelReady } from '../domain/flashcards.js';
+import {
+  getLevelCounts,
+  getNextReviewAt,
+  getReadyCount,
+  getStats,
+  isLevelReady,
+} from '../domain/flashcards.js';
 
 const LEVELS = [
   { label: 'Starting out', short: 'Start', tone: 'sage' },
@@ -19,15 +25,25 @@ const LEVELS = [
   { label: 'Learned for good', short: 'Learned', tone: 'gold' },
 ];
 
-export function Overview({ state, onNavigate, onStartSession }) {
+function formatReviewDate(value) {
+  return new Intl.DateTimeFormat('en', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(new Date(value));
+}
+
+export function Overview({ state, onNavigate, onStartSession, now = Date.now() }) {
   const stats = getStats(state);
   const levelCounts = getLevelCounts(state);
-  const recommendedLevel = [1, 2, 3, 4].find((level) => isLevelReady(state, level));
+  const recommendedLevel = [1, 2, 3, 4].find((level) => isLevelReady(state, level, now));
+  const nextReviewAt = getNextReviewAt(state, null, now);
   const today = new Intl.DateTimeFormat('en', {
     weekday: 'long',
     month: 'long',
     day: 'numeric',
-  }).format(new Date());
+  }).format(new Date(now));
 
   return (
     <div className="page-stack">
@@ -48,8 +64,10 @@ export function Overview({ state, onNavigate, onStartSession }) {
               <h2>Ready to keep your<br className="desktop-break" /> Spanish in motion?</h2>
               <p>
                 {recommendedLevel
-                  ? `${getReadyCount(state, recommendedLevel)} words are ready when you are.`
-                  : 'Your next set is taking shape. Keep moving through your current words.'}
+                  ? `${getReadyCount(state, recommendedLevel, now)} words are ready when you are.`
+                  : nextReviewAt
+                    ? `Words that changed levels rest for 24 hours. Your next review opens ${formatReviewDate(nextReviewAt)}.`
+                    : 'Your next set is taking shape. Keep moving through your current words.'}
               </p>
               {recommendedLevel ? (
                 <button className="button button-light" onClick={() => onStartSession(recommendedLevel)}>
@@ -122,7 +140,7 @@ export function Overview({ state, onNavigate, onStartSession }) {
             const level = index + 1;
             const count = levelCounts[index].count;
             const percentage = level === 5 ? (count ? 100 : 0) : Math.min((count / 50) * 100, 100);
-            const ready = level < 5 && isLevelReady(state, level);
+            const ready = level < 5 && isLevelReady(state, level, now);
             return (
               <article className={`roadmap-card tone-${item.tone} ${ready ? 'is-ready' : ''}`} key={item.label}>
                 <div className="roadmap-topline">
@@ -136,7 +154,7 @@ export function Overview({ state, onNavigate, onStartSession }) {
                 </div>
                 <div className="roadmap-track"><span style={{ width: `${percentage}%` }} /></div>
                 <div className="roadmap-foot">
-                  {level === 5 ? 'Learned for good' : ready ? `${getReadyCount(state, level)} ready to review` : 'Building your set'}
+                  {level === 5 ? 'Learned for good' : ready ? `${getReadyCount(state, level, now)} ready to review` : 'Building your set'}
                 </div>
               </article>
             );

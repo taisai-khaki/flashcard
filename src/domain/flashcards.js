@@ -6,6 +6,8 @@ export const ROUND_SIZE = 50;
  * (Roughly 165 KB of local storage at capacity.)
  */
 export const HISTORY_LIMIT = 1500;
+/** A card that changes levels rests for a full day before becoming reviewable. */
+export const REVIEW_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
 const DATE_NOW = () => new Date().toISOString();
 
@@ -20,6 +22,37 @@ function cleanText(value) {
 
 function wordKey(word) {
   return `${cleanText(word.spanish).toLocaleLowerCase()}\u0000${cleanText(word.english).toLocaleLowerCase()}`;
+}
+
+function toTimestamp(value) {
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function currentTimestamp(now = Date.now()) {
+  return toTimestamp(now) ?? Date.now();
+}
+
+/**
+ * Older saved cards only recorded `lastAnsweredAt`. Use it as a compatibility
+ * fallback so cards answered just before this cooldown was introduced do not
+ * immediately become reviewable after an app upgrade.
+ */
+function wordReviewTimestamp(word) {
+  if (word.nextReviewAt !== undefined) {
+    if (word.nextReviewAt === null || word.nextReviewAt === '') return null;
+    return toTimestamp(word.nextReviewAt);
+  }
+
+  const lastAnswered = toTimestamp(word.lastAnsweredAt);
+  return lastAnswered === null ? null : lastAnswered + REVIEW_COOLDOWN_MS;
+}
+
+function wordIsDue(word, nowTimestamp) {
+  const reviewTimestamp = wordReviewTimestamp(word);
+  return reviewTimestamp === null || reviewTimestamp <= nowTimestamp;
 }
 
 export function createEmptyState() {
@@ -63,6 +96,7 @@ export function addWords(state, entries) {
       incorrectCount: 0,
       addedAt: entry.addedAt || DATE_NOW(),
       lastAnsweredAt: null,
+      nextReviewAt: null,
     });
   }
 
@@ -165,16 +199,42 @@ function activeAtLevel(state, level) {
   );
 }
 
+function dueAtLevel(state, level, nowTimestamp) {
+  return activeAtLevel(state, level).filter((word) => wordIsDue(word, nowTimestamp));
+}
+
+/** Number of active words at this level whose review date has arrived. */
+export function getDueCount(state, level, now = Date.now()) {
+  return dueAtLevel(state, level, currentTimestamp(now)).length;
+}
+
+/** The next future review time for a level, or for the whole bank if omitted. */
+export function getNextReviewAt(state, level = null, now = Date.now()) {
+  const nowTimestamp = currentTimestamp(now);
+  const timestamps = state.words
+    .filter((word) =>
+      word.status === 'active' && (level === null || word.level === level),
+    )
+    .map(wordReviewTimestamp)
+    .filter((timestamp) => timestamp !== null && timestamp > nowTimestamp);
+
+  if (!timestamps.length) return null;
+  const earliest = timestamps.reduce((minimum, timestamp) => Math.min(minimum, timestamp), Infinity);
+  return new Date(earliest).toISOString();
+}
+
 /**
  * Levels 2–4 normally wait until a full set of 50 accumulates. If no words
  * remain in a lower level or in the bank, a smaller final set can be reviewed
- * so a short vocabulary list can still progress all the way through.
+ * so a short vocabulary list can still progress all the way through. Only
+ * cards whose review date has arrived count as ready or enter a session.
  */
-export function isLevelReady(state, level) {
+export function isLevelReady(state, level, now = Date.now()) {
   if (level < 1 || level >= LEVEL_COUNT) return false;
-  const count = activeAtLevel(state, level).length;
-  if (count === 0) return false;
-  if (level === 1 || count >= ROUND_SIZE) return true;
+  const activeWords = activeAtLevel(state, level);
+  const dueCount = dueAtLevel(state, level, currentTimestamp(now)).length;
+  if (dueCount === 0) return false;
+  if (level === 1 || activeWords.length >= ROUND_SIZE) return true;
 
   const hasWordsStillWorkingThroughEarlierStages = state.words.some(
     (word) =>
@@ -184,9 +244,9 @@ export function isLevelReady(state, level) {
   return !hasWordsStillWorkingThroughEarlierStages;
 }
 
-export function getReadyCount(state, level) {
-  if (!isLevelReady(state, level)) return 0;
-  return Math.min(activeAtLevel(state, level).length, ROUND_SIZE);
+export function getReadyCount(state, level, now = Date.now()) {
+  if (!isLevelReady(state, level, now)) return 0;
+  return Math.min(dueAtLevel(state, level, currentTimestamp(now)).length, ROUND_SIZE);
 }
 
 function shuffled(items, random = Math.random) {
@@ -199,10 +259,17 @@ function shuffled(items, random = Math.random) {
 }
 
 /** Build a snapshot for one study round, with mixed direction chosen per card. */
-export function createSession(state, level, direction = 'mixed', random = Math.random) {
-  if (!isLevelReady(state, level)) return null;
+export function createSession(
+  state,
+  level,
+  direction = 'mixed',
+  random = Math.random,
+  now = Date.now(),
+) {
+  const nowTimestamp = currentTimestamp(now);
+  if (!isLevelReady(state, level, nowTimestamp)) return null;
 
-  const cards = shuffled(activeAtLevel(state, level), random)
+  const cards = shuffled(dueAtLevel(state, level, nowTimestamp), random)
     .slice(0, ROUND_SIZE)
     .map((word) => ({
       wordId: word.id,
@@ -226,6 +293,13 @@ export function recordAnswer(state, wordId, correct, answeredAt = DATE_NOW()) {
     ? Math.min(LEVEL_COUNT, target.level + 1)
     : Math.max(1, target.level - 1);
   const learned = correct && nextLevel === LEVEL_COUNT;
+  const changedLevel = nextLevel !== target.level;
+  const answeredTimestamp = toTimestamp(answeredAt) ?? Date.now();
+  const nextReviewAt = learned
+    ? null
+    : changedLevel
+      ? new Date(answeredTimestamp + REVIEW_COOLDOWN_MS).toISOString()
+      : target.nextReviewAt ?? null;
 
   const words = state.words.map((word) => {
     if (word.id !== wordId) return word;
@@ -236,6 +310,7 @@ export function recordAnswer(state, wordId, correct, answeredAt = DATE_NOW()) {
       correctCount: word.correctCount + (correct ? 1 : 0),
       incorrectCount: word.incorrectCount + (correct ? 0 : 1),
       lastAnsweredAt: answeredAt,
+      nextReviewAt,
     };
   });
 

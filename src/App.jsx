@@ -49,6 +49,7 @@ export default function App() {
   const [appState, setAppState] = useState(loadState);
   const [activeView, setActiveView] = useState('overview');
   const [direction, setDirection] = useState('mixed');
+  const [now, setNow] = useState(() => Date.now());
   const [session, setSession] = useState(null);
   const [summary, setSummary] = useState(null);
   // Where "back to study room" should actually lead, once a round is over.
@@ -60,6 +61,19 @@ export default function App() {
       return result.added ? result.state : current;
     });
   }, [SEED_WORDS]);
+
+  // Keep date-gated review sets current if the app stays open or regains focus.
+  useEffect(() => {
+    const updateClock = () => setNow(Date.now());
+    const interval = window.setInterval(updateClock, 60_000);
+    window.addEventListener('focus', updateClock);
+    document.addEventListener('visibilitychange', updateClock);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', updateClock);
+      document.removeEventListener('visibilitychange', updateClock);
+    };
+  }, []);
 
   useEffect(() => {
     try {
@@ -173,7 +187,7 @@ export default function App() {
 
         <main className="content-area">
           {activeView === 'overview' && (
-            <Overview state={appState} onNavigate={navigateTo} onStartSession={startSession} />
+            <Overview state={appState} onNavigate={navigateTo} onStartSession={startSession} now={now} />
           )}
           {activeView === 'study' && (
             <StudyPage
@@ -182,6 +196,7 @@ export default function App() {
               onDirectionChange={setDirection}
               onStartSession={startSession}
               summary={summary}
+              now={now}
             />
           )}
           {activeView === 'progress' && (
@@ -189,6 +204,7 @@ export default function App() {
               state={appState}
               onNavigate={navigateTo}
               onStartSession={startSession}
+              now={now}
             />
           )}
           {activeView === 'bank' && <BankPage state={appState} onImport={importWords} />}
