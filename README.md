@@ -16,6 +16,16 @@ npm run build
 npm test
 ```
 
+## Publish to GitHub Pages
+
+This is a Vite app, so GitHub Pages must serve the compiled site rather than the source files. To create the static site for this repository, run:
+
+```bash
+npm run build:pages
+```
+
+Commit the generated `docs/` directory along with any app changes. In **Settings → Pages**, choose **Deploy from a branch**, select **`main`** and **`/docs`**, then save. The Pages build base is set to `/flashcard/` for this repository URL.
+
 ## Add vocabulary
 
 Pairs can be pasted in the **Word bank** screen, one per line, with Spanish first. Supported separators include a dash, comma, semicolon, pipe, or tab:
