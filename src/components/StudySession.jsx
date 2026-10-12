@@ -101,8 +101,8 @@ export function StudySession({ session, state, onReveal, onAnswer, onExit }) {
       <div className="session-bottom-note">
         <span className="bottom-note-icon"><ArrowLeft size={15} /></span>
         {session.level === 1
-          ? 'Correct answers move up. Missed words stay here for another try.'
-          : 'Correct answers move up a level. Missed words drop back one level.'}
+          ? 'Correct answers move up; missed words stay here. Any level change starts a 24-hour rest before the next review.'
+          : 'Correct answers move up; missed words drop back one level. A level change starts a 24-hour rest before the next review.'}
       </div>
     </div>
   );

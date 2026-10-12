@@ -206,8 +206,9 @@ button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px
 .ready-label > span { width: 5px; height: 5px; background: #79a166; border-radius: 50%; }
 .learned-label { color: #977a4c; background: #f7f0e1; }
 .learned-forever { display: flex; align-items: center; gap: 6px; color: #a18a5e; font-size: 9px; font-weight: 600; }
-.level-waiting { display: flex; align-items: center; gap: 7px; color: #9ba49c; font-size: 9px; }
-.level-waiting svg { color: #aeb8af; }
+.level-waiting { display: flex; align-items: center; gap: 7px; max-width: 225px; color: #9ba49c; font-size: 9px; line-height: 1.4; }
+.level-waiting span { overflow-wrap: anywhere; }
+.level-waiting svg { flex: 0 0 auto; color: #aeb8af; }
 .level-row-index { display: grid; place-items: center; color: #b6beb7; font-size: 8px; }
 .study-empty-state { display: flex; flex-direction: column; align-items: center; padding: 45px 20px 48px; text-align: center; background: #fff; border: 1px dashed #dfe6dc; border-radius: 15px; }
 .empty-illustration { display: grid; place-items: center; width: 52px; height: 52px; color: #65916a; background: #eff5e9; border-radius: 17px; }

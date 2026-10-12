@@ -354,12 +354,12 @@ function LevelPipelineRow({ level, count, accuracy, total, tone }) {
 
 /* -------------------------------------------------------------------- page */
 
-export function AnalyticsPage({ state, onNavigate, onStartSession }) {
+export function AnalyticsPage({ state, onNavigate, onStartSession, now = Date.now() }) {
   const [range, setRange] = useState(30);
   const [hoverIndex, setHoverIndex] = useState(null);
   const [hoveredDay, setHoveredDay] = useState(null);
 
-  const report = useMemo(() => getProgressReport(state, range), [state, range]);
+  const report = useMemo(() => getProgressReport(state, range, new Date(now)), [state, range, now]);
   const { comparison, streak, forecast, stats, activity, buckets, levelAccuracy, movement, toughest, levelCounts, insights } = report;
 
   const current = comparison.current;

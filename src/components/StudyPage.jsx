@@ -4,12 +4,20 @@ import {
   Check,
   CheckCheck,
   CircleDashed,
+  Clock3,
   Layers3,
   LockKeyhole,
   RotateCcw,
   Shuffle,
 } from 'lucide-react';
-import { getLevelCounts, getReadyCount, getStats, isLevelReady } from '../domain/flashcards.js';
+import {
+  getDueCount,
+  getLevelCounts,
+  getNextReviewAt,
+  getReadyCount,
+  getStats,
+  isLevelReady,
+} from '../domain/flashcards.js';
 
 const LEVEL_COPY = [
   { title: 'First steps', note: 'New words find their rhythm here.', tone: 'sage' },
@@ -25,10 +33,19 @@ const DIRECTIONS = [
   { id: 'mixed', title: 'Mix it up', hint: 'A little of both', icon: Shuffle },
 ];
 
-export function StudyPage({ state, direction, onDirectionChange, onStartSession, summary }) {
+function formatReviewDate(value) {
+  return new Intl.DateTimeFormat('en', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(new Date(value));
+}
+
+export function StudyPage({ state, direction, onDirectionChange, onStartSession, summary, now = Date.now() }) {
   const levelCounts = getLevelCounts(state);
   const stats = getStats(state);
-  const hasAnyReady = [1, 2, 3, 4].some((level) => isLevelReady(state, level));
+  const hasAnyReady = [1, 2, 3, 4].some((level) => isLevelReady(state, level, now));
 
   return (
     <div className="page-stack">
@@ -36,7 +53,7 @@ export function StudyPage({ state, direction, onDirectionChange, onStartSession,
         <div>
           <div className="eyebrow"><span className="eyebrow-dot" /> YOUR PRACTICE</div>
           <h1>Study room</h1>
-          <p>Focused rounds of up to 50 cards, at your pace.</p>
+          <p>Focused rounds of up to 50 due cards. Words that change levels rest for at least 24 hours.</p>
         </div>
         <div className="study-total-pill"><Layers3 size={16} /><strong>{stats.active}</strong> words in progress</div>
       </div>
@@ -83,7 +100,7 @@ export function StudyPage({ state, direction, onDirectionChange, onStartSession,
             <div className="section-kicker">YOUR FIVE-LEVEL PATH</div>
             <h2>Choose a set to review</h2>
           </div>
-          <span className="batch-note"><CircleDashed size={14} /> Sets unlock as they fill</span>
+          <span className="batch-note"><Clock3 size={14} /> Moved words rest for 24 hours</span>
         </div>
 
         {stats.total === 0 ? (
@@ -97,11 +114,12 @@ export function StudyPage({ state, direction, onDirectionChange, onStartSession,
             {LEVEL_COPY.map((item, index) => {
               const level = index + 1;
               const data = levelCounts[index];
-              const ready = level < 5 && isLevelReady(state, level);
-              const readyCount = level < 5 ? getReadyCount(state, level) : 0;
+              const dueCount = level < 5 ? getDueCount(state, level, now) : 0;
+              const nextReviewAt = level < 5 ? getNextReviewAt(state, level, now) : null;
+              const ready = level < 5 && isLevelReady(state, level, now);
+              const readyCount = level < 5 ? getReadyCount(state, level, now) : 0;
               const percentage = level === 5 ? (data.count ? 100 : 0) : Math.min((data.count / 50) * 100, 100);
               const isLearned = level === 5;
-              const isBuilding = !ready && !isLearned && data.count > 0;
               const lowerLevelPending = level > 1 && level < 5 && state.words.some(
                 (word) => word.status === 'banked' || (word.status === 'active' && word.level < level),
               );
@@ -132,8 +150,22 @@ export function StudyPage({ state, direction, onDirectionChange, onStartSession,
                       <span className="learned-forever"><CheckCheck size={16} /> Yours for good</span>
                     ) : (
                       <div className="level-waiting">
-                        {data.count === 0 ? <LockKeyhole size={15} /> : <CircleDashed size={15} />}
-                        <span>{data.count === 0 ? 'Waiting for words' : lowerLevelPending ? 'Building the next set' : 'Set is taking shape'}</span>
+                        {data.count === 0 ? (
+                          <LockKeyhole size={15} />
+                        ) : dueCount === 0 && nextReviewAt ? (
+                          <Clock3 size={15} />
+                        ) : (
+                          <CircleDashed size={15} />
+                        )}
+                        <span>
+                          {data.count === 0
+                            ? 'Waiting for words'
+                            : dueCount === 0 && nextReviewAt
+                              ? `Next review ${formatReviewDate(nextReviewAt)}`
+                              : lowerLevelPending
+                                ? `Building the set${dueCount ? ` · ${dueCount} due` : ''}`
+                                : 'Set is taking shape'}
+                        </span>
                       </div>
                     )}
                   </div>
@@ -148,7 +180,7 @@ export function StudyPage({ state, direction, onDirectionChange, onStartSession,
       {!hasAnyReady && stats.total > 0 && (
         <div className="study-footnote-card">
           <span className="footnote-icon"><RotateCcw size={16} /></span>
-          <span>As you answer cards, words move through the path. Once a full set is ready, it will appear here for review.</span>
+          <span>Cards that change levels rest for at least 24 hours. Due words appear here as soon as their review date arrives.</span>
           <ArrowUpRight size={15} />
         </div>
       )}

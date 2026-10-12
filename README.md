@@ -57,6 +57,7 @@ Analytics live in `src/domain/analytics.js` as pure functions over the app state
 
 - Level 1 is kept topped up to 50 words when the bank has words available. The app can practice a smaller set when the entire bank is smaller than 50.
 - Correct answers move a word forward one level. A missed Level 1 word stays there; a missed word in Levels 2–4 drops one level.
+- When an answer changes a word’s level, that word waits at least 24 hours before it can be reviewed again. Study rounds include only words whose review time has arrived.
 - Levels 2–4 normally wait until 50 words have accumulated before a review round. If no words remain in lower levels or the bank, a smaller final set can be reviewed so a short list does not get stuck.
 - A correct answer that moves a word from Level 4 marks it learned at Level 5; learned words are not put back into regular review.
 - Practice direction can be Spanish → English, English → Spanish, or mixed randomly per card.
