@@ -1,6 +1,6 @@
 # Palabra · Spanish flashcards
 
-A responsive, browser-based Spanish vocabulary practice app. The repository includes the app shell, word-bank importer, five-level learning flow, and local progress persistence. The starter bank contains 858 unique English–Spanish pairs from the learner’s submitted lists, including present and preterite first-person forms for 116 regular verbs. Spanish conjugation cards omit the subject pronoun "yo".
+A responsive, browser-based Spanish vocabulary practice app. The repository includes the app shell, word-bank importer, five-level learning flow, and local progress persistence. The starter bank contains 1,518 unique English–Spanish pairs from the learner’s submitted lists: first-person present/preterite forms for 116 regular verbs, plus present and preterite conjugations for 66 irregular verbs across five subject groups. Spanish subject pronouns are omitted from conjugation cards.
 
 ## Run locally
 

@@ -1,8 +1,9 @@
 import { YO_CONJUGATION_CARDS } from './regularConjugations.js';
+import { IRREGULAR_VERB_CARDS } from './irregularConjugations.js';
 
 /**
- * Starter vocabulary bank from the learner's submitted lists plus 232 first-person
- * present/preterite cards. Spanish conjugations omit the subject pronoun "yo".
+ * Vocabulary submitted by the learner, plus 232 regular first-person forms and
+ * 660 irregular conjugation cards. Spanish subject pronouns are omitted.
  */
 const BASE_WORDS = [
   // 1. Possessives
@@ -680,4 +681,4 @@ const BASE_WORDS = [
   { english: 'To would like / Would like', spanish: 'Gustar (Gustaría)' },
 ];
 
-export const SEED_WORDS = [...BASE_WORDS, ...YO_CONJUGATION_CARDS];
+export const SEED_WORDS = [...BASE_WORDS, ...YO_CONJUGATION_CARDS, ...IRREGULAR_VERB_CARDS];

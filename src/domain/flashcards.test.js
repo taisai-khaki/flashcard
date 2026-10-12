@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { SEED_WORDS } from '../data/seedWords.js';
 import { FIRST_PERSON_VERB_FORMS, YO_CONJUGATION_CARDS } from '../data/regularConjugations.js';
+import { IRREGULAR_VERB_CARDS, IRREGULAR_VERB_COUNT } from '../data/irregularConjugations.js';
 import {
   addWords,
   createEmptyState,
@@ -21,8 +22,8 @@ function pairs(count) {
   }));
 }
 
-test('the vocabulary bank retains all 858 complete unique pairs', () => {
-  assert.equal(SEED_WORDS.length, 858);
+test('the vocabulary bank retains all 1518 complete unique pairs', () => {
+  assert.equal(SEED_WORDS.length, 1518);
   assert.ok(SEED_WORDS.every((word) => word.spanish.trim() && word.english.trim()));
   const keys = SEED_WORDS.map((word) => JSON.stringify([word.english.toLocaleLowerCase(), word.spanish.toLocaleLowerCase()]));
   assert.equal(new Set(keys).size, SEED_WORDS.length);
@@ -32,6 +33,16 @@ test('116 verbs each contribute present and preterite forms without yo', () => {
   assert.equal(FIRST_PERSON_VERB_FORMS.length, 116);
   assert.equal(YO_CONJUGATION_CARDS.length, 232);
   assert.ok(YO_CONJUGATION_CARDS.every((word) => !word.spanish.toLocaleLowerCase().startsWith('yo ')));
+});
+
+test('66 irregular verbs each contribute five present and five preterite cards without subjects', () => {
+  assert.equal(IRREGULAR_VERB_COUNT, 66);
+  assert.equal(IRREGULAR_VERB_CARDS.length, 660);
+  const subjectLabels = ['yo ', 'tú ', 'él ', 'ella ', 'usted ', 'nosotros ', 'nosotras ', 'ellos ', 'ellas ', 'ustedes '];
+  assert.ok(IRREGULAR_VERB_CARDS.every((word) => {
+    const spanish = word.spanish.toLocaleLowerCase();
+    return !subjectLabels.some((label) => spanish.startsWith(label));
+  }));
 });
 
 test('the bank fills Level 1 to 50 and leaves the rest waiting', () => {
