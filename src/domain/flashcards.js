@@ -20,8 +20,12 @@ function cleanText(value) {
   return String(value ?? '').trim().replace(/\s+/g, ' ');
 }
 
+function spanishKey(spanish) {
+  return cleanText(spanish).toLocaleLowerCase();
+}
+
 function wordKey(word) {
-  return `${cleanText(word.spanish).toLocaleLowerCase()}\u0000${cleanText(word.english).toLocaleLowerCase()}`;
+  return `${spanishKey(word.spanish)}\u0000${cleanText(word.english).toLocaleLowerCase()}`;
 }
 
 function toTimestamp(value) {
@@ -249,6 +253,16 @@ export function getReadyCount(state, level, now = Date.now()) {
   return Math.min(dueAtLevel(state, level, currentTimestamp(now)).length, ROUND_SIZE);
 }
 
+/** Count visible cards for a fixed practice direction. Spanish prompts merge by word. */
+export function getReadyCardCount(state, level, direction, now = Date.now()) {
+  if (!isLevelReady(state, level, now)) return 0;
+  const dueWords = dueAtLevel(state, level, currentTimestamp(now));
+  if (direction === 'es-en') {
+    return Math.min(new Set(dueWords.map((word) => spanishKey(word.spanish))).size, ROUND_SIZE);
+  }
+  return Math.min(dueWords.length, ROUND_SIZE);
+}
+
 function shuffled(items, random = Math.random) {
   const result = [...items];
   for (let index = result.length - 1; index > 0; index -= 1) {
@@ -258,7 +272,7 @@ function shuffled(items, random = Math.random) {
   return result;
 }
 
-/** Build a snapshot for one study round, with mixed direction chosen per card. */
+/** Build a round. Spanish → English merges words that share one Spanish prompt. */
 export function createSession(
   state,
   level,
@@ -269,60 +283,105 @@ export function createSession(
   const nowTimestamp = currentTimestamp(now);
   if (!isLevelReady(state, level, nowTimestamp)) return null;
 
-  const cards = shuffled(dueAtLevel(state, level, nowTimestamp), random)
-    .slice(0, ROUND_SIZE)
-    .map((word) => ({
-      wordId: word.id,
-      direction:
-        direction === 'mixed'
-          ? random() < 0.5
-            ? 'es-en'
-            : 'en-es'
-          : direction,
-    }));
+  const dueWords = shuffled(dueAtLevel(state, level, nowTimestamp), random);
+  const meaningsBySpanish = new Map();
+  for (const word of state.words) {
+    const key = spanishKey(word.spanish);
+    const meanings = meaningsBySpanish.get(key) ?? [];
+    const english = cleanText(word.english);
+    if (!meanings.some((meaning) => meaning.toLocaleLowerCase() === english.toLocaleLowerCase())) {
+      meanings.push(english);
+    }
+    meaningsBySpanish.set(key, meanings);
+  }
 
-  return { level, direction, cards };
+  const cards = [];
+  const spanishCards = new Map();
+
+  for (const word of dueWords) {
+    const cardDirection = direction === 'mixed'
+      ? (random() < 0.5 ? 'es-en' : 'en-es')
+      : direction;
+
+    if (cardDirection === 'en-es') {
+      cards.push({ wordId: word.id, wordIds: [word.id], direction: cardDirection });
+      continue;
+    }
+
+    const key = spanishKey(word.spanish);
+    const existingCard = spanishCards.get(key);
+    if (existingCard) {
+      existingCard.wordIds.push(word.id);
+      continue;
+    }
+
+    const card = {
+      wordId: word.id,
+      wordIds: [word.id],
+      direction: 'es-en',
+      prompt: word.spanish,
+      answer: meaningsBySpanish.get(key) ?? [word.english],
+    };
+    spanishCards.set(key, card);
+    cards.push(card);
+  }
+
+  return { level, direction, cards: cards.slice(0, ROUND_SIZE) };
 }
 
-/** Move a single card based on the learner's self-assessment. */
-export function recordAnswer(state, wordId, correct, answeredAt = DATE_NOW()) {
-  const target = state.words.find((word) => word.id === wordId);
-  if (!target || target.status !== 'active') return state;
-
-  const nextLevel = correct
-    ? Math.min(LEVEL_COUNT, target.level + 1)
-    : Math.max(1, target.level - 1);
-  const learned = correct && nextLevel === LEVEL_COUNT;
-  const changedLevel = nextLevel !== target.level;
+/** Move one or more word pairs represented by a flashcard. */
+export function recordAnswers(state, wordIds, correct, answeredAt = DATE_NOW()) {
+  const ids = [...new Set(Array.isArray(wordIds) ? wordIds : [wordIds])];
   const answeredTimestamp = toTimestamp(answeredAt) ?? Date.now();
-  const nextReviewAt = learned
-    ? null
-    : changedLevel
-      ? new Date(answeredTimestamp + REVIEW_COOLDOWN_MS).toISOString()
-      : target.nextReviewAt ?? null;
+  const updates = new Map();
+  const historyEntries = [];
 
-  const words = state.words.map((word) => {
-    if (word.id !== wordId) return word;
-    return {
-      ...word,
+  for (const wordId of ids) {
+    const target = state.words.find((word) => word.id === wordId);
+    if (!target || target.status !== 'active') continue;
+
+    const nextLevel = correct
+      ? Math.min(LEVEL_COUNT, target.level + 1)
+      : Math.max(1, target.level - 1);
+    const learned = correct && nextLevel === LEVEL_COUNT;
+    const changedLevel = nextLevel !== target.level;
+    const nextReviewAt = learned
+      ? null
+      : changedLevel
+        ? new Date(answeredTimestamp + REVIEW_COOLDOWN_MS).toISOString()
+        : target.nextReviewAt ?? null;
+
+    updates.set(wordId, {
+      ...target,
       level: nextLevel,
       status: learned ? 'learned' : 'active',
-      correctCount: word.correctCount + (correct ? 1 : 0),
-      incorrectCount: word.incorrectCount + (correct ? 0 : 1),
+      correctCount: target.correctCount + (correct ? 1 : 0),
+      incorrectCount: target.incorrectCount + (correct ? 0 : 1),
       lastAnsweredAt: answeredAt,
       nextReviewAt,
-    };
-  });
+    });
+    historyEntries.push({
+      wordId,
+      correct: Boolean(correct),
+      fromLevel: target.level,
+      toLevel: nextLevel,
+      answeredAt,
+    });
+  }
+
+  if (updates.size === 0) return state;
 
   return {
     ...state,
-    words,
-    history: [
-      { wordId, correct: Boolean(correct), fromLevel: target.level, toLevel: nextLevel, answeredAt },
-      ...state.history,
-    ].slice(0, HISTORY_LIMIT),
+    words: state.words.map((word) => updates.get(word.id) ?? word),
+    history: [...historyEntries, ...state.history].slice(0, HISTORY_LIMIT),
     updatedAt: answeredAt,
   };
+}
+
+/** Move a single word pair based on the learner's self-assessment. */
+export function recordAnswer(state, wordId, correct, answeredAt = DATE_NOW()) {
+  return recordAnswers(state, [wordId], correct, answeredAt);
 }
 
 /** Complete a round; Level 1 is replenished after all its cards are answered. */

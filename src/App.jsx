@@ -12,7 +12,7 @@ import {
   createInitialState,
   createSession,
   finishSession,
-  recordAnswer,
+  recordAnswers,
 } from './domain/flashcards.js';
 import { SEED_WORDS } from './data/seedWords.js';
 
@@ -107,7 +107,11 @@ export default function App() {
     const currentCard = session.cards[session.index];
     const nextCorrect = session.correct + (correct ? 1 : 0);
     const nextIncorrect = session.incorrect + (correct ? 0 : 1);
-    const updated = recordAnswer(appState, currentCard.wordId, correct);
+    const updated = recordAnswers(
+      appState,
+      currentCard.wordIds ?? [currentCard.wordId],
+      correct,
+    );
     const isLastCard = session.index === session.cards.length - 1;
 
     if (isLastCard) {
