@@ -15,8 +15,9 @@ export function StudySession({ session, state, onReveal, onAnswer, onExit }) {
   const word = state.words.find((item) => item.id === card?.wordId);
   const revealed = session?.revealed ?? false;
   const directionLabel = card?.direction === 'es-en' ? 'SPANISH → ENGLISH' : 'ENGLISH → SPANISH';
-  const prompt = card?.direction === 'es-en' ? word?.spanish : word?.english;
-  const answer = card?.direction === 'es-en' ? word?.english : word?.spanish;
+  const prompt = card?.prompt ?? (card?.direction === 'es-en' ? word?.spanish : word?.english);
+  const answer = card?.answer ?? (card?.direction === 'es-en' ? word?.english : word?.spanish);
+  const answerMeanings = Array.isArray(answer) ? answer : [answer];
   const answerLanguage = card?.direction === 'es-en' ? 'ENGLISH' : 'SPANISH';
 
   useEffect(() => {
@@ -65,7 +66,15 @@ export function StudySession({ session, state, onReveal, onAnswer, onExit }) {
               <div className="flashcard-answer">
                 <span className="answer-divider"><i /></span>
                 <span className="flashcard-language answer-language">{answerLanguage}</span>
-                <strong>{answer}</strong>
+                {answerMeanings.length > 1 ? (
+                  <div className="flashcard-meaning-list">
+                    {answerMeanings.map((meaning, index) => (
+                      <span key={`${meaning}-${index}`}>{meaning}</span>
+                    ))}
+                  </div>
+                ) : (
+                  <strong>{answerMeanings[0]}</strong>
+                )}
               </div>
             ) : (
               <span className="flashcard-hint">Think of the meaning, then reveal it</span>

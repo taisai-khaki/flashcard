@@ -14,7 +14,7 @@ import {
   getDueCount,
   getLevelCounts,
   getNextReviewAt,
-  getReadyCount,
+  getReadyCardCount,
   getStats,
   isLevelReady,
 } from '../domain/flashcards.js';
@@ -117,7 +117,9 @@ export function StudyPage({ state, direction, onDirectionChange, onStartSession,
               const dueCount = level < 5 ? getDueCount(state, level, now) : 0;
               const nextReviewAt = level < 5 ? getNextReviewAt(state, level, now) : null;
               const ready = level < 5 && isLevelReady(state, level, now);
-              const readyCount = level < 5 ? getReadyCount(state, level, now) : 0;
+              const readyCount = level < 5 && direction !== 'mixed'
+                ? getReadyCardCount(state, level, direction, now)
+                : null;
               const percentage = level === 5 ? (data.count ? 100 : 0) : Math.min((data.count / 50) * 100, 100);
               const isLearned = level === 5;
               const lowerLevelPending = level > 1 && level < 5 && state.words.some(
@@ -144,7 +146,7 @@ export function StudyPage({ state, direction, onDirectionChange, onStartSession,
                   <div className="level-row-action">
                     {ready ? (
                       <button className="button button-primary button-compact" onClick={() => onStartSession(level)}>
-                        Review {readyCount} <ArrowRight size={15} />
+                        Review{readyCount !== null ? ` ${readyCount}` : ''} <ArrowRight size={15} />
                       </button>
                     ) : isLearned ? (
                       <span className="learned-forever"><CheckCheck size={16} /> Yours for good</span>

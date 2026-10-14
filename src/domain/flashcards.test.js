@@ -9,10 +9,12 @@ import {
   createSession,
   getDueCount,
   getNextReviewAt,
+  getReadyCardCount,
   getStats,
   isLevelReady,
   parseWordLines,
   recordAnswer,
+  recordAnswers,
   finishSession,
   REVIEW_COOLDOWN_MS,
   ROUND_SIZE,
@@ -138,6 +140,69 @@ test('sessions include only due cards from a filled level', () => {
   assert.equal(getDueCount(inLevelTwo, 2, now), 1);
   assert.equal(createSession(inLevelTwo, 2, 'es-en', () => 0.5, now).cards.length, 1);
   assert.equal(isLevelReady(inLevelTwo, 2, nextDay), true);
+});
+
+test('Spanish-to-English sessions merge duplicate Spanish prompts and reveal every English meaning', () => {
+  const state = addWords(createEmptyState(), [
+    { spanish: 'Mal', english: 'Poorly / Bad' },
+    { spanish: 'mal', english: 'Not well / Bad' },
+    { spanish: 'bien', english: 'Well' },
+  ]).state;
+  const session = createSession(state, 1, 'es-en', () => 0.5);
+  const mergedCard = session.cards.find((card) => card.wordIds.length === 2);
+
+  assert.equal(session.cards.length, 2, 'the two mal pairs appear as one Spanish prompt');
+  assert.ok(mergedCard);
+  assert.equal(mergedCard.prompt.toLocaleLowerCase(), 'mal');
+  assert.deepEqual(mergedCard.answer, ['Poorly / Bad', 'Not well / Bad']);
+  assert.deepEqual(new Set(mergedCard.wordIds), new Set(state.words.slice(0, 2).map((word) => word.id)));
+  assert.equal(getReadyCardCount(state, 1, 'es-en'), 2);
+});
+
+test('English-to-Spanish keeps each English pair as its own card', () => {
+  const state = addWords(createEmptyState(), [
+    { spanish: 'Mal', english: 'Poorly / Bad' },
+    { spanish: 'mal', english: 'Not well / Bad' },
+    { spanish: 'bien', english: 'Well' },
+  ]).state;
+  const session = createSession(state, 1, 'en-es', () => 0.5);
+
+  assert.equal(session.cards.length, 3);
+  assert.ok(session.cards.every((card) => card.direction === 'en-es' && card.wordIds.length === 1));
+  assert.equal(new Set(session.cards.map((card) => card.wordId)).size, 3);
+  assert.equal(getReadyCardCount(state, 1, 'en-es'), 3);
+});
+
+test('a merged Spanish card records progress for every due English meaning', () => {
+  const state = addWords(createEmptyState(), [
+    { spanish: 'por', english: 'By / Through' },
+    { spanish: 'Por', english: 'For (cause, exchange, duration, means)' },
+  ]).state;
+  const card = createSession(state, 1, 'es-en', () => 0.5).cards[0];
+  const answeredAt = '2026-10-10T10:00:00.000Z';
+  const updated = recordAnswers(state, card.wordIds, true, answeredAt);
+
+  assert.equal(card.wordIds.length, 2);
+  assert.ok(card.wordIds.every((id) => {
+    const word = updated.words.find((item) => item.id === id);
+    return word.level === 2 && word.correctCount === 1 && word.lastAnsweredAt === answeredAt;
+  }));
+  assert.deepEqual(new Set(updated.history.map((entry) => entry.wordId)), new Set(card.wordIds));
+});
+
+test('Spanish cards show translations even when their pairs are at another level', () => {
+  const initial = addWords(createEmptyState(), [
+    { spanish: 'como', english: 'Like / As' },
+    { spanish: 'Como', english: 'I eat' },
+  ]).state;
+  const state = {
+    ...initial,
+    words: initial.words.map((word, index) => index === 1 ? { ...word, level: 2 } : word),
+  };
+  const card = createSession(state, 1, 'es-en', () => 0.5).cards[0];
+
+  assert.deepEqual(card.answer, ['Like / As', 'I eat']);
+  assert.equal(card.wordIds.length, 1, 'only the due pair advances with this Level 1 card');
 });
 
 test('correctly reaching Level 5 marks the word learned permanently', () => {
